@@ -1,8 +1,9 @@
-CREATE EXTENSION IF NOT EXISTS pgcrypto;  
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;  -- for gen_random_uuid()
 
+-- ---------------------------------------------------------------------------
 -- Enums
-
+-- ---------------------------------------------------------------------------
 
 CREATE TYPE vehicle_class AS ENUM (
     'two_wheeler',      -- exempt at most plazas
@@ -30,6 +31,21 @@ CREATE TYPE identification_method AS ENUM (
 CREATE TYPE payment_status AS ENUM ('paid', 'pending', 'failed', 'waived', 'disputed');
 
 CREATE TYPE trip_status AS ENUM ('in_progress', 'completed', 'abandoned');
+
+CREATE TYPE exception_type AS ENUM (
+    'low_confidence_plate',
+    'tag_mismatch',
+    'no_identification',
+    'tag_not_found',
+    'policy_violation',
+    'device_fault'
+);
+
+CREATE TYPE device_type AS ENUM ('camera_front', 'camera_rear', 'rfid_reader', 'barrier');
+
+CREATE TYPE device_status AS ENUM ('online', 'degraded', 'offline');
+
+CREATE TYPE user_role AS ENUM ('admin', 'operator', 'auditor', 'viewer');
 
 -- ---------------------------------------------------------------------------
 -- highways
@@ -157,7 +173,10 @@ CREATE UNIQUE INDEX uq_tariffs_active_segment
 
 CREATE TABLE vehicles (
     vehicle_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    plate_number        VARCHAR(15) NOT NULL,          -- normalized, e.g. 'MH12AB1234'
+    plate_number        VARCHAR(15),                    -- normalized, e.g. 'MH12AB1234'; nullable — a
+                                                           -- vehicle may first be identified via RFID only,
+                                                           -- with the plate filled in once ANPR confirms it
+                                                           -- (Postgres UNIQUE allows multiple NULLs)
     registration_state  CHAR(2),
     vehicle_class       vehicle_class NOT NULL DEFAULT 'unknown',
     fastag_id           VARCHAR(32),                    -- FASTag-like RFID tag ID
@@ -248,3 +267,75 @@ CREATE INDEX ix_transactions_applied_rules_gin ON transactions USING GIN (applie
 
 COMMENT ON COLUMN transactions.applied_rules IS
   'Ordered list of rule identifiers that fired for this charge, e.g. ["tariff:base","discount:local_resident(-50%)"] — the audit trail required by P3.';
+
+-- ---------------------------------------------------------------------------
+-- exceptions
+-- Operator-facing exception queue for the dashboard (P4): low-confidence
+-- plates, ANPR/RFID mismatches, unregistered tags, device faults, etc.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE exceptions (
+    exception_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    transaction_id  UUID REFERENCES transactions(transaction_id) ON DELETE CASCADE,
+    plaza_id        UUID REFERENCES plazas(plaza_id) ON DELETE SET NULL,
+    lane_id         VARCHAR(20),
+
+    exception_type  exception_type NOT NULL,
+    details         TEXT,
+    resolved        BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ix_exceptions_transaction_id ON exceptions(transaction_id);
+CREATE INDEX ix_exceptions_plaza_unresolved ON exceptions(plaza_id, created_at) WHERE NOT resolved;
+
+
+-- devices
+-- Camera / RFID reader / barrier health, for the P4 device-health panel.
+
+
+CREATE TABLE devices (
+    device_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name              VARCHAR(150),
+    device_type       device_type NOT NULL,
+    plaza_id          UUID REFERENCES plazas(plaza_id) ON DELETE SET NULL,
+    lane_id           VARCHAR(20),
+
+    status            device_status NOT NULL DEFAULT 'online',
+    error_count_24h   INTEGER NOT NULL DEFAULT 0,
+    avg_latency_ms    NUMERIC(8,2),
+    last_heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ix_devices_plaza_id ON devices(plaza_id);
+
+
+-- users
+-- Dashboard accounts with role-based access (P6).
+
+
+CREATE TABLE users (
+    user_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username        VARCHAR(80) NOT NULL UNIQUE,
+    hashed_password VARCHAR(200) NOT NULL,
+    role            user_role NOT NULL DEFAULT 'viewer',
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+
+-- audit_logs
+-- Action/access audit trail (P6): who viewed/exported/was-denied what.
+
+
+CREATE TABLE audit_logs (
+    audit_log_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor         VARCHAR(80) NOT NULL,        -- username, or 'system'
+    action        VARCHAR(100) NOT NULL,       -- e.g. 'view_transaction', 'export_report', 'access_denied'
+    resource_type VARCHAR(50),
+    resource_id   VARCHAR(100),
+    metadata_json JSONB NOT NULL DEFAULT '{}',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX ix_audit_logs_actor_time ON audit_logs(actor, created_at);
