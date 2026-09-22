@@ -1,0 +1,24 @@
+fastapi>=0.111
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+psycopg[binary]>=3.1
+alembic>=1.13
+pydantic>=2.7
+pydantic-settings>=2.3
+jinja2>=3.1
+python-multipart>=0.0.9
+passlib[bcrypt]>=1.7
+python-jose[cryptography]>=3.3
+pyyaml>=6.0
+numpy>=1.26
+opencv-python-headless>=4.10
+pillow>=10.3
+pytest>=8.2
+httpx>=0.27
+
+# Optional (heavier) ANPR deep-learning deps — uncomment when trained
+# weights / a real dataset are available. Left out of the default install
+# so the scaffold runs on any machine, including without a GPU.
+# torch>=2.3
+# ultralytics>=8.2        # YOLO-class plate detector
+# easyocr>=1.7            # or paddleocr>=2.7
