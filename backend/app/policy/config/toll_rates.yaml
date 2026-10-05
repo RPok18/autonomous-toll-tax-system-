@@ -1,0 +1,47 @@
+# Toll policy configuration — P3.
+# Rates are illustrative (INR); replace with real plaza-notified rates.
+# Every rule that fires against a transaction is recorded in
+# Transaction.applied_rules for auditability.
+
+plazas:
+  plaza-01:
+    name: "NH-Demo Plaza 01"
+    base_rates:
+      two_wheeler: 0          # exempt per MoRTH policy
+      car_jeep_van: 65
+      lcv: 105
+      bus_truck: 220
+      hcv_mav: 355
+      oversized: 690
+      exempt_other: 0
+      unknown: 65              # conservative default; also raises a review flag
+
+    # Time-of-day multipliers (24h, local time). Non-overlapping windows;
+    # anything not covered uses multiplier 1.0.
+    time_of_day_rules:
+      - name: night_surcharge
+        start_hour: 23
+        end_hour: 5
+        multiplier: 1.0        # placeholder: set >1.0 to enable a night surcharge
+        description: "Late-night window (no surcharge by default; toggle here)"
+
+    # Flat discount rules, evaluated in order; first match applies.
+    discount_rules:
+      - name: local_resident_pass
+        condition: "vehicle.is_local_resident"
+        discount_percent: 50
+        description: "Registered local resident monthly-pass discount"
+      - name: return_trip_within_window
+        condition: "return_trip"
+        discount_percent: 100
+        window_hours: 24
+        description: "Same-vehicle return trip within 24h (single toll plaza)"
+
+    # Surcharges layered on top of base_rate * time_multiplier.
+    surcharge_rules:
+      - name: unregistered_tag_surcharge
+        condition: "exception.tag_not_found"
+        surcharge_percent: 25
+        description: "Penalty surcharge for unregistered/blacklisted RFID tag"
+
+    currency: INR
