@@ -7,6 +7,7 @@ from app.models.enums import IdentificationMethod
 from app.rfid.simulator import RFIDReadResult
 from app.anpr.reader import ANPRSignal
 
+
 @dataclass
 class FusionResult:
     identification_method: IdentificationMethod
@@ -23,7 +24,7 @@ class FusionEngine:
 
     Resolution order:
       1. Both signals present and agree (RFID's registered plate == ANPR
-         plate) -> FUSION, high confidence, no exception.
+         plate) -> HYBRID_AGREED, high confidence, no exception.
       2. Only one signal present and usable -> that signal's method alone.
       3. Both present but disagree -> fall back to configured primary
          signal, but flag as an exception so it gets audited.
@@ -58,7 +59,7 @@ class FusionEngine:
             ):
                 notes.append("anpr_rfid_agree")
                 return FusionResult(
-                    identification_method=IdentificationMethod.FUSION,
+                    identification_method=IdentificationMethod.HYBRID_AGREED,
                     plate_number=anpr.plate_number,
                     tag_id=rfid.tag_id,
                     confidence=round(max(anpr.confidence, rfid.confidence), 3),
@@ -72,7 +73,7 @@ class FusionEngine:
             if primary == "rfid":
                 notes.append("resolved_by_primary:rfid")
                 return FusionResult(
-                    identification_method=IdentificationMethod.RFID,
+                    identification_method=IdentificationMethod.HYBRID_RFID_PRIMARY,
                     plate_number=registered_plate_for_tag,
                     tag_id=rfid.tag_id,
                     confidence=rfid.confidence,
@@ -81,7 +82,7 @@ class FusionEngine:
                 )
             notes.append("resolved_by_primary:anpr")
             return FusionResult(
-                identification_method=IdentificationMethod.ANPR,
+                identification_method=IdentificationMethod.HYBRID_ANPR_PRIMARY,
                 plate_number=anpr.plate_number,
                 tag_id=rfid.tag_id,
                 confidence=anpr.confidence,
@@ -93,7 +94,7 @@ class FusionEngine:
         if rfid_ok and not anpr_ok:
             notes.append("rfid_only")
             return FusionResult(
-                identification_method=IdentificationMethod.RFID,
+                identification_method=IdentificationMethod.RFID_ONLY,
                 plate_number=registered_plate_for_tag,
                 tag_id=rfid.tag_id,
                 confidence=rfid.confidence,
@@ -105,7 +106,7 @@ class FusionEngine:
         if anpr_ok and not rfid_ok:
             notes.append("anpr_only")
             return FusionResult(
-                identification_method=IdentificationMethod.ANPR,
+                identification_method=IdentificationMethod.ANPR_ONLY,
                 plate_number=anpr.plate_number,
                 tag_id=rfid.tag_id,
                 confidence=anpr.confidence,
