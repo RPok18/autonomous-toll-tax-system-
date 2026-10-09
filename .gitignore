@@ -16,3 +16,4 @@ data/raw/
 *.pt
 *.onnx
 node_modules/
+"`n.env"
