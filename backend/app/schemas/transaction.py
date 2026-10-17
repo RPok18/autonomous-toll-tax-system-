@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -33,7 +34,7 @@ class TransactionCreate(BaseModel):
     currency: str = "INR"
     payment_status: PaymentStatus = PaymentStatus.PENDING
 
-    applied_rules: list[str] = []
+    applied_rules: list[str | dict[str, Any]] = []
     is_exception: bool = False
     latency_ms: Decimal | None = None
 
@@ -62,7 +63,7 @@ class TransactionRead(ORMBase):
     currency: str
     payment_status: PaymentStatus
 
-    applied_rules: list[str]
+    applied_rules: list[str | dict[str, Any]]
     is_exception: bool
     latency_ms: Decimal | None
 
