@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, Boolean, DateTime
+from sqlalchemy import CheckConstraint, Column, Numeric, String, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 
@@ -17,6 +17,7 @@ class Vehicle(Base):
     plate_number = Column(String(15), unique=True, nullable=True)  # normalized, e.g. "MH12AB1234"
     registration_state = Column(String(2), nullable=True)
     vehicle_class = Column(pg_enum(VehicleClass, "vehicle_class"), nullable=False, default=VehicleClass.UNKNOWN)
+    balance = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
     fastag_id = Column(String(32), unique=True, nullable=True)  # FASTag-like RFID tag ID
     fastag_issuer_bank = Column(String(64), nullable=True)
     is_commercial = Column(Boolean, nullable=False, default=False)
@@ -28,6 +29,8 @@ class Vehicle(Base):
 
     transactions = relationship("Transaction", back_populates="vehicle")
     trips = relationship("Trip", back_populates="vehicle")
+
+    __table_args__ = (CheckConstraint("balance >= 0", name="ck_vehicles_nonnegative_balance"),)
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Vehicle plate={self.plate_number} tag={self.fastag_id} class={self.vehicle_class}>"

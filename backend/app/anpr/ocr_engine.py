@@ -5,6 +5,7 @@ import re
 import cv2
 import numpy as np
 import pytesseract
+from app.anpr.text_bands import find_text_bands
 
 # Indian vehicle registration plate pattern, e.g. MH12AB1234 or DL1LT5678
 PLATE_PATTERN = re.compile(r"^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$")
@@ -88,9 +89,39 @@ class TesseractOCREngine:
 
         return candidates
 
+    def _try_multi_line(self, plate_crop) -> tuple[str, float] | None:
+        """If the crop contains more than one distinct text band, OCR
+        each one separately (top to bottom) and concatenate. Returns
+        None if only one band (or none) is found, so the caller falls
+        through to the normal single-line path unchanged."""
+        gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
+        gray_f = cv2.bilateralFilter(gray, 11, 17, 17)
+        edged = cv2.Canny(gray_f, 30, 200)
+
+        bands = find_text_bands(edged, min_height_frac=0.1, max_height_frac=0.6, min_segments=2)
+        if len(bands) < 2:
+            return None
+
+        h, w = plate_crop.shape[:2]
+        line_texts = []
+        for (y0, y1) in sorted(bands):
+            yy0, yy1 = max(0, y0 - 2), min(h, y1 + 2)
+            line_texts.append(self._ocr_once(plate_crop[yy0:yy1, 0:w]))
+
+        combined = "".join(line_texts)
+        if not combined:
+            return None
+
+        confidence = 0.85 if PLATE_PATTERN.match(combined) else 0.35
+        return combined, confidence
+
     def recognize(self, plate_crop) -> tuple[str | None, float]:
         if plate_crop is None:
             return None, 0.0
+
+        multi_line_result = self._try_multi_line(plate_crop)
+        if multi_line_result is not None:
+            return multi_line_result
 
         attempts = [self._ocr_once(plate_crop)]
         attempts.extend(self._ocr_once(c) for c in self._perspective_candidates(plate_crop))
