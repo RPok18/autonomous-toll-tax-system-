@@ -21,9 +21,15 @@ class ExceptionRecord(Base):
     exception_type = Column(pg_enum(ExceptionType, "exception_type"), nullable=False)
     details = Column(Text, nullable=True)
     resolved = Column(Boolean, default=False)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    image_path = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     transaction = relationship("Transaction", back_populates="exceptions")
+
+    @property
+    def has_image(self) -> bool:
+        return self.image_path is not None
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Exception {self.exception_type} tx={self.transaction_id}>"
