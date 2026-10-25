@@ -4,9 +4,11 @@ import random
 import shutil
 from pathlib import Path
 
-IMAGES_DIR = Path(r"E:\plates\images\images")
-LABELS_DIR = Path(r"E:\plates\yolo_labels")
-OUTPUT_DIR = Path(r"E:\plates\yolo_dataset")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PLATES_DIR = REPO_ROOT / "plates"
+IMAGES_DIR = PLATES_DIR / "images" / "images"
+LABELS_DIR = PLATES_DIR / "yolo_labels"
+OUTPUT_DIR = PLATES_DIR / "yolo_dataset"
 
 VAL_FRACTION = 0.15
 RANDOM_SEED = 42

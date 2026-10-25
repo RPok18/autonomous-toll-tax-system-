@@ -1,4 +1,4 @@
-path: E:/plates/yolo_dataset
+path: E:/autonomous toll tax system/plates/yolo_dataset
 train: images/train
 val: images/val
 names:
