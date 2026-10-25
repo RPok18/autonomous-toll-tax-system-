@@ -1,5 +1,7 @@
 """Centralized, env-driven settings for the toll system."""
 from functools import lru_cache
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,11 +20,16 @@ class Settings(BaseSettings):
     anpr_device: str = "cpu"  # "cpu" or "cuda:0" for RTX 2050 4GB
     anpr_min_confidence: float = 0.55
     anpr_image_retention_days: int = 7  # P6 data minimization
+    plate_image_dir: str = "data/plate_images"
+    max_plate_image_bytes: int = 5 * 1024 * 1024
+    record_retention_days: int = 365
 
     # P2 - RFID / fusion
     rfid_simulate: bool = True
     rfid_read_timeout_ms: int = 300
+    rfid_min_confidence: float = 0.55
     fusion_mode: str = "hybrid"  # hybrid | anpr_only | rfid_only
+    fusion_primary_signal: Literal["anpr", "rfid"] = "anpr"
 
     # Auth
     access_token_expire_minutes: int = 60
