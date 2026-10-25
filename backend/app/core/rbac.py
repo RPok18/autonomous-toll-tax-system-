@@ -1,6 +1,6 @@
 """Role-based access control dependencies (P6).
 
-A bearer token carries `sub` (user ID) and `role`; `require_role` is a
+A bearer token carries `sub` (username) and `role`; `require_role` is a
 FastAPI dependency factory that 403s anyone without an allowed role.
 Every denied check also writes an audit log entry.
 """
@@ -15,7 +15,7 @@ from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.user import UserRole
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=False)
 
 
 def get_current_identity(token: str | None = Depends(oauth2_scheme)) -> dict:
@@ -25,7 +25,7 @@ def get_current_identity(token: str | None = Depends(oauth2_scheme)) -> dict:
         payload = decode_access_token(token)
     except Exception as exc:  # invalid/expired token
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token") from exc
-    return {"sub": payload["sub"], "username": payload["sub"], "role": payload["role"]}
+    return {"username": payload["sub"], "role": payload["role"]}
 
 
 def require_role(*allowed_roles: UserRole):

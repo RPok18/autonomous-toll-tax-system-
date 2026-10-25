@@ -26,6 +26,4 @@ class ExceptionRead(ORMBase):
     exception_type: ExceptionType
     details: str | None
     resolved: bool
-    resolved_at: datetime | None
     created_at: datetime
-    has_image: bool
