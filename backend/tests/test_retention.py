@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import uuid
+import uuidL
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
