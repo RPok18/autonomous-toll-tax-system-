@@ -22,8 +22,8 @@ outcomes so the team can compare scenarios consistently.
 - Reproducible runs across configurable random seeds and vehicle-pass counts.
 - Summary measures for correct, wrong, silent-wrong, unresolved, and
   exception outcomes; toll deduction correctness; misbilled and missed
-  revenue shares; and simulated p50/p95 latency.
-- Optional per-pass CSV output to investigate individual modeled outcomes.
+  revenue shares; and modeled RFID-read p50/p95 latency.
+- Optional per-pass CSV and console output to inspect each vehicle result.
 
 Disagreement exceptions are held rather than charged in the simulated ledger.
 The output also distinguishes a payment to the true vehicle from a payment
@@ -36,13 +36,18 @@ From the `backend` directory:
 ```text
 python scripts/run_simulation.py --list
 python scripts/run_simulation.py --scenario all --passes 10000 --seeds 1-5
+python scripts/run_simulation.py --scenario all --passes 100 --seeds 42 --per-pass
 python scripts/run_simulation.py --scenario S3 --seeds 1 --per-pass
 ```
 
 The default output directory is `simulation_results`. Each run writes
 `summary.csv` and `summary_by_scenario.csv`; it also writes `fusion_gain.csv`
 when the baseline and both single-signal comparison scenarios are included.
-With `--per-pass`, it writes one pass-level CSV per scenario and seed.
+With `--per-pass`, it writes one pass-level CSV per scenario and seed and
+prints a deterministic result line for every vehicle pass. S10 deliberately
+combines unreadable ANPR with no available RFID tag to exercise exception
+routing. The console output and simulation results are reproducible for a
+fixed seed; wall-clock processing time is not included in the modeled latency.
 
 ## How to interpret the results
 
@@ -56,8 +61,8 @@ registry. It does not process real images, measure a camera or detector's
 runtime, or establish a production accuracy or revenue forecast. S4's 0.81
 ANPR detection rate is a proxy based on a YOLO detector recall measurement
 from a small validation set; it is not end-to-end OCR accuracy. Reported
-latency is simulation decision plus modeled RFID-read latency, not roadside
-hardware latency.
+latency is modeled RFID-read latency, not roadside hardware or local
+simulation processing time.
 
 ## CV experiment evidence
 

@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.simulation.export import write_pass_csv, write_rows_csv  # noqa: E402
 from app.simulation.metrics import aggregate, fusion_gain, summarise  # noqa: E402
-from app.simulation.runner import run_scenario  # noqa: E402
+from app.simulation.runner import PassRecord, run_scenario  # noqa: E402
 from app.simulation.scenarios import SCENARIOS, get_scenarios, threshold_sweep  # noqa: E402
 
 
@@ -35,13 +35,24 @@ def parse_seeds(text: str) -> list[int]:
 
 
 def print_table(rows: list[dict]) -> None:
-    header = f"{'scenario':<16}{'correct':>9}{'wrong':>8}{'silent':>8}{'unres.':>8}{'exc.':>8}{'p95 ms':>9}"
+    header = f"{'scenario':<16}{'correct':>9}{'wrong':>8}{'silent':>8}{'unres.':>8}{'exc.':>8}"
     print(header)
     print("-" * len(header))
     for r in rows:
         print(f"{r['scenario']:<16}{r['correct_pct']:>9.2f}{r['wrong_pct']:>8.2f}"
               f"{r['silent_wrong_pct']:>8.2f}{r['unresolved_pct']:>8.2f}"
-              f"{r['exception_pct']:>8.2f}{r['latency_p95_ms']:>9.1f}")
+              f"{r['exception_pct']:>8.2f}")
+
+
+def print_passes(scenario: str, seed: int, records: list[PassRecord]) -> None:
+    for record in records:
+        route = "exception" if record.fusion_exception else "charge"
+        print(
+            f"{scenario} seed={seed} pass={record.pass_no} vehicle={record.true_plate} "
+            f"anpr={record.anpr_plate or 'unreadable'} method={record.method} "
+            f"route={route} status={record.charge_status} "
+            f"charged={record.charged_amount:.2f}"
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -78,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
             summaries.append(summarise(records, sc.scenario_id, seed))
             if args.per_pass:
                 write_pass_csv(out_dir / f"passes_{sc.scenario_id}_seed{seed}.csv", records)
+                print_passes(sc.scenario_id, seed, records)
 
     by_scenario = aggregate(summaries)
     write_rows_csv(out_dir / "summary.csv", summaries)
