@@ -7,7 +7,6 @@ per-vehicle cases in the article can be tested with hand-built signals.
 from __future__ import annotations
 
 import random
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -19,6 +18,7 @@ from app.models.enums import VehicleClass
 from app.policy.rules_engine import PolicyEngine, TollContext
 from app.rfid.simulator import RFIDReadResult, RFIDSimulator
 from app.simulation.scenarios import Scenario
+from app.toll.calculator import TollCalculator
 
 PLAZA_ID = "plaza-01"
 POOL_SIZE = 500
@@ -95,7 +95,6 @@ class PassRecord:
     charged_amount: float = 0.0
     charged_to_true_vehicle: bool = False
     balance_delta_ok: bool = False
-    decision_ms: float = 0.0
 
 
 def process_pass(
@@ -117,11 +116,11 @@ def process_pass(
     raised. Flagged passes are held for manual review and are not charged.
     """
     context = context or TollContext(timestamp=datetime(2026, 10, 1, 12))
-    started = time.perf_counter()
-
     registered_plate = registry.plate_for_tag(rfid.tag_id) if (rfid.tag_id and rfid.tag_registered) else None
     result = engine.resolve(anpr, rfid, registered_plate)
-    expected = Decimal(str(policy.compute(plaza_id, true_vehicle.vehicle_class, context).amount_charged))
+    expected = TollCalculator.calculate_simulated_amount(
+        policy, plaza_id, true_vehicle.vehicle_class, context
+    )
 
     resolved = normalise_plate(result.plate_number)
     true_plate = normalise_plate(true_vehicle.plate)
@@ -144,7 +143,9 @@ def process_pass(
         if target is None:
             status = "no_vehicle"
         else:
-            amount = Decimal(str(policy.compute(plaza_id, target.vehicle_class, context).amount_charged))
+            amount = TollCalculator.calculate_simulated_amount(
+                policy, plaza_id, target.vehicle_class, context
+            )
             if target.balance < amount:
                 status = "insufficient_balance"
             else:
@@ -155,7 +156,6 @@ def process_pass(
                 to_true = target is true_vehicle
                 delta_ok = (before - target.balance) == amount
 
-    decision_ms = (time.perf_counter() - started) * 1000.0
     return PassRecord(
         pass_no=pass_no,
         true_plate=true_vehicle.plate,
@@ -178,7 +178,6 @@ def process_pass(
         charged_amount=float(charged),
         charged_to_true_vehicle=to_true,
         balance_delta_ok=delta_ok,
-        decision_ms=round(decision_ms, 4),
     )
 
 
@@ -191,8 +190,7 @@ class _Settings:
 
 
 def run_scenario(scenario: Scenario, seed: int, passes: int) -> list[PassRecord]:
-    """Run one scenario with one seed. Same scenario and seed give the same
-    identification results (only the timing columns differ between runs)."""
+    """Run one scenario with one seed and return deterministic pass records."""
     if passes < 0:
         raise ValueError("passes must not be negative")
 

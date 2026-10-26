@@ -59,7 +59,7 @@ def summarise(records, scenario_id: str, seed: int) -> dict:
     out["misbilled_share_pct"] = _pct(misbilled, expected_total)
     out["missed_revenue_share_pct"] = _pct(missed, expected_total)
 
-    latency = [r.rfid_latency_ms + r.decision_ms for r in records]
+    latency = [r.rfid_latency_ms for r in records]
     out["latency_p50_ms"] = percentile(latency, 50)
     out["latency_p95_ms"] = percentile(latency, 95)
     return out

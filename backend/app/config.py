@@ -1,5 +1,7 @@
 """Centralized, env-driven settings for the toll system."""
 from functools import lru_cache
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,7 +24,9 @@ class Settings(BaseSettings):
     # P2 - RFID / fusion
     rfid_simulate: bool = True
     rfid_read_timeout_ms: int = 300
+    rfid_min_confidence: float = 0.55
     fusion_mode: str = "hybrid"  # hybrid | anpr_only | rfid_only
+    fusion_primary_signal: Literal["anpr", "rfid"] = "anpr"
 
     # Auth
     access_token_expire_minutes: int = 60

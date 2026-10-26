@@ -47,6 +47,9 @@ _BASE = [
              clone_share=0.05, primary_signal="rfid"),
     Scenario("S8b", "Cloned tags, ANPR primary", "Same as S8, ANPR wins a conflict",
              clone_share=0.05, primary_signal="anpr"),
+    Scenario("S10", "Unreadable plates",
+             "ANPR cannot read plates and vehicles have no RFID tags",
+             anpr={"detect_rate": 0.0}, tag_share=0.0),
 ]
 
 SCENARIOS: dict[str, Scenario] = {s.scenario_id: s for s in _BASE}
