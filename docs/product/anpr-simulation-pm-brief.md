@@ -37,6 +37,7 @@ From the `backend` directory:
 python scripts/run_simulation.py --list
 python scripts/run_simulation.py --scenario all --passes 10000 --seeds 1-5
 python scripts/run_simulation.py --scenario all --passes 100 --seeds 42 --per-pass
+python scripts/run_simulation.py --scenario S3 --seeds 1 --per-pass
 ```
 
 The default output directory is `simulation_results`. Each run writes
