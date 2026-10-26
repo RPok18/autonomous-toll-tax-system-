@@ -132,6 +132,12 @@ class FakeQuery:
         end = None if self.limit_value is None else self.offset_value + self.limit_value
         return records[self.offset_value:end]
 
+    def count(self) -> int:
+        return sum(
+            self._matches(record)
+            for record in self.session.database.records.get(self.model, [])
+        )
+
 
 class FakeSession:
     def __init__(self, database: FakeDatabase) -> None:
@@ -260,7 +266,14 @@ def api_client(monkeypatch: pytest.MonkeyPatch):
         transaction,
         device,
         exception_record,
-        Plaza(plaza_id=PLAZA_ID, plaza_code="PLZ-A", is_active=True),
+        Plaza(
+            plaza_id=PLAZA_ID,
+            plaza_code="PLZ-A",
+            name="Test plaza",
+            state_code="MH",
+            num_lanes=1,
+            is_active=True,
+        ),
         User(
             user_id=uuid.UUID("00000000-0000-0000-0000-000000000601"),
             username="operator",
@@ -280,6 +293,7 @@ def api_client(monkeypatch: pytest.MonkeyPatch):
 
     app.dependency_overrides[get_db] = get_fake_db
     app.dependency_overrides[get_current_identity] = lambda: {
+        "sub": "operator",
         "username": "operator",
         "role": UserRole.ADMIN.value,
     }
@@ -313,6 +327,13 @@ def api_client(monkeypatch: pytest.MonkeyPatch):
         ("GET", f"/transactions/{TRANSACTION_ID}", None, None, 200),
         ("GET", f"/transactions/by-vehicle/{VEHICLE_ID}", None, None, 200),
         ("GET", "/transactions", None, {"plate_number": "mh12ab1234"}, 200),
+        (
+            "GET",
+            "/transactions",
+            None,
+            {"from": "2026-10-25T00:00:00+00:00", "to": "2026-10-26T00:00:00+00:00"},
+            200,
+        ),
         ("POST", "/devices", {"name": "New reader", "device_type": "rfid_reader"}, None, 201),
         ("GET", f"/devices/{DEVICE_ID}", None, None, 200),
         ("GET", "/devices", None, {"status_filter": "offline"}, 200),
@@ -320,6 +341,8 @@ def api_client(monkeypatch: pytest.MonkeyPatch):
         ("POST", "/exceptions", {"exception_type": "device_fault"}, None, 201),
         ("GET", f"/exceptions/{EXCEPTION_ID}", None, None, 200),
         ("GET", "/exceptions", None, {"resolved": "false"}, 200),
+        ("GET", "/plazas", None, None, 200),
+        ("GET", "/dashboard/", None, None, 200),
         ("PATCH", f"/exceptions/{EXCEPTION_ID}/resolve", None, None, 200),
         ("GET", "/health", None, None, 200),
     ],
@@ -336,6 +359,18 @@ def test_every_api_endpoint_has_a_success_case(
     response = client.request(method, path, json=payload, params=params)
 
     assert response.status_code == expected_status, response.text
+
+
+def test_dashboard_static_assets_are_served(api_client):
+    client, _ = api_client
+    page = client.get("/dashboard/")
+    script = client.get("/dashboard/app.js")
+    stylesheet = client.get("/dashboard/style.css")
+
+    assert page.status_code == script.status_code == stylesheet.status_code == 200
+    assert "text/html" in page.headers["content-type"]
+    assert "javascript" in script.headers["content-type"]
+    assert "text/css" in stylesheet.headers["content-type"]
 
 
 @pytest.mark.parametrize(

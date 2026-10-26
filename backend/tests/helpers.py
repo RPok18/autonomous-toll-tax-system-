@@ -18,11 +18,17 @@ def add_vehicle(db, *, plate_number: str = "MH12AB1234") -> Vehicle:
     return vehicle
 
 
-def add_exception(db, seed, *, resolved: bool = False) -> ExceptionRecord:
+def add_exception(
+    db,
+    seed,
+    *,
+    resolved: bool = False,
+    exception_type: ExceptionType = ExceptionType.TAG_MISMATCH,
+) -> ExceptionRecord:
     exception = ExceptionRecord(
         plaza_id=seed.plaza.plaza_id,
         lane_id="L1",
-        exception_type=ExceptionType.TAG_MISMATCH,
+        exception_type=exception_type,
         resolved=resolved,
     )
     db.add(exception)
