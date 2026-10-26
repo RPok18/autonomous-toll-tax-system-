@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_action
 from app.database import get_db
 from app.api.deps import require_role
-from app.models.enums import UserRole
+from app.models.enums import ExceptionType, UserRole
 from app.models.exception import ExceptionRecord
 from app.schemas.exception import ExceptionCreate, ExceptionRead
 
@@ -59,9 +59,13 @@ def get_exception(exception_id: uuid.UUID, db: Session = Depends(get_db)) -> Exc
     dependencies=[Depends(require_role(UserRole.OPERATOR, UserRole.ADMIN, UserRole.AUDITOR))],
 )
 def list_exceptions(
+    response: Response,
     resolved: bool | None = None,
     plaza_id: uuid.UUID | None = None,
-    limit: int = 50,
+    transaction_id: uuid.UUID | None = None,
+    exception_type: ExceptionType | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> list[ExceptionRecord]:
     query = db.query(ExceptionRecord)
@@ -69,7 +73,17 @@ def list_exceptions(
         query = query.filter_by(resolved=resolved)
     if plaza_id is not None:
         query = query.filter_by(plaza_id=plaza_id)
-    return query.order_by(ExceptionRecord.created_at.desc()).limit(limit).all()
+    if transaction_id is not None:
+        query = query.filter_by(transaction_id=transaction_id)
+    if exception_type is not None:
+        query = query.filter_by(exception_type=exception_type)
+    response.headers["X-Total-Count"] = str(query.count())
+    return (
+        query.order_by(ExceptionRecord.created_at.desc(), ExceptionRecord.exception_id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
 
 @router.patch(

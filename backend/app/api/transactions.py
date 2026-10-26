@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.audit import log_action
@@ -21,16 +21,25 @@ def _list_transaction_history(
     db: Session,
     *,
     vehicle_id: uuid.UUID | None = None,
+    transaction_id: uuid.UUID | None = None,
     plate_number: str | None = None,
     plaza_id: uuid.UUID | None = None,
     payment_status: PaymentStatus | None = None,
     is_exception: bool | None = None,
     start_time: datetime | None = None,
     end_time: datetime | None = None,
+    from_time: datetime | None = None,
+    to_time: datetime | None = None,
     limit: int = 50,
     offset: int = 0,
+    response: Response | None = None,
 ) -> list[Transaction]:
-    for field_name, value in (("start_time", start_time), ("end_time", end_time)):
+    for field_name, value in (
+        ("start_time", start_time),
+        ("end_time", end_time),
+        ("from", from_time),
+        ("to", to_time),
+    ):
         if value is not None and (value.tzinfo is None or value.utcoffset() is None):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -40,6 +49,11 @@ def _list_transaction_history(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="start_time must be before or equal to end_time",
+        )
+    if from_time is not None and to_time is not None and from_time > to_time:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="'from' must be before or equal to 'to'",
         )
 
     normalized_plate = normalize_plate_number(plate_number) if plate_number is not None else None
@@ -53,6 +67,7 @@ def _list_transaction_history(
         key: value
         for key, value in {
             "vehicle_id": vehicle_id,
+            "transaction_id": transaction_id,
             "plate_number": normalized_plate,
             "plaza_id": plaza_id,
             "payment_status": payment_status,
@@ -68,6 +83,12 @@ def _list_transaction_history(
         query = query.filter(Transaction.transaction_time >= start_time)
     if end_time is not None:
         query = query.filter(Transaction.transaction_time <= end_time)
+    if from_time is not None:
+        query = query.filter(Transaction.transaction_time >= from_time)
+    if to_time is not None:
+        query = query.filter(Transaction.transaction_time < to_time)
+    if response is not None:
+        response.headers["X-Total-Count"] = str(query.count())
 
     return (
         query.order_by(Transaction.transaction_time.desc(), Transaction.transaction_id.desc())
@@ -152,26 +173,34 @@ def list_vehicle_transactions(
     summary="Search transaction history",
 )
 def list_transactions(
+    response: Response,
     vehicle_id: uuid.UUID | None = None,
+    transaction_id: uuid.UUID | None = None,
     plate_number: str | None = None,
     plaza_id: uuid.UUID | None = None,
     payment_status: PaymentStatus | None = None,
     is_exception: bool | None = None,
     start_time: datetime | None = None,
     end_time: datetime | None = None,
-    limit: int = Query(default=50, ge=1, le=100),
+    from_time: datetime | None = Query(default=None, alias="from"),
+    to_time: datetime | None = Query(default=None, alias="to"),
+    limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> list[Transaction]:
     return _list_transaction_history(
         db,
         vehicle_id=vehicle_id,
+        transaction_id=transaction_id,
         plate_number=plate_number,
         plaza_id=plaza_id,
         payment_status=payment_status,
         is_exception=is_exception,
         start_time=start_time,
         end_time=end_time,
+        from_time=from_time,
+        to_time=to_time,
         limit=limit,
         offset=offset,
+        response=response,
     )

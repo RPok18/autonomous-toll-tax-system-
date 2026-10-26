@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import sys
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -48,6 +48,9 @@ class FakeQuery:
     def all(self):
         return self.results
 
+    def count(self):
+        return len(self.results)
+
 
 class FakeSession:
     def __init__(self, results):
@@ -64,8 +67,10 @@ def test_transaction_history_filters_and_paginates():
     now = datetime.now(timezone.utc)
     transactions = [SimpleNamespace(transaction_id=uuid.uuid4())]
     db = FakeSession(transactions)
+    response = Response()
 
     result = transaction_api.list_transactions(
+        response=response,
         vehicle_id=vehicle_id,
         plate_number="mh 12-ab 1234",
         plaza_id=plaza_id,
@@ -73,6 +78,8 @@ def test_transaction_history_filters_and_paginates():
         is_exception=False,
         start_time=now - timedelta(days=1),
         end_time=now,
+        from_time=None,
+        to_time=None,
         limit=20,
         offset=10,
         db=db,
@@ -90,6 +97,7 @@ def test_transaction_history_filters_and_paginates():
     assert len(db.query_result.ordering) == 2
     assert db.query_result.offset_value == 10
     assert db.query_result.limit_value == 20
+    assert response.headers["X-Total-Count"] == "1"
 
 
 def test_vehicle_transaction_history_filters_by_vehicle_and_status():
@@ -124,8 +132,11 @@ def test_transaction_history_rejects_reversed_time_range():
 
     with pytest.raises(HTTPException) as exc_info:
         transaction_api.list_transactions(
+            response=Response(),
             start_time=now,
             end_time=now - timedelta(seconds=1),
+            from_time=None,
+            to_time=None,
             limit=50,
             offset=0,
             db=FakeSession([]),
@@ -138,7 +149,11 @@ def test_transaction_history_rejects_reversed_time_range():
 def test_transaction_history_rejects_timezone_naive_range():
     with pytest.raises(HTTPException) as exc_info:
         transaction_api.list_transactions(
+            response=Response(),
             start_time=datetime(2026, 1, 1),
+            end_time=None,
+            from_time=None,
+            to_time=None,
             limit=50,
             offset=0,
             db=FakeSession([]),
@@ -151,7 +166,10 @@ def test_transaction_history_rejects_timezone_naive_range():
 def test_transaction_history_rejects_empty_normalized_plate():
     with pytest.raises(HTTPException) as exc_info:
         transaction_api.list_transactions(
+            response=Response(),
             plate_number=" --- ",
+            from_time=None,
+            to_time=None,
             limit=50,
             offset=0,
             db=FakeSession([]),
