@@ -20,11 +20,11 @@ if TEST_DATABASE_URL:
 
 from app.core.security import create_access_token  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
+from main import app  # noqa: E402
 from app.models.enums import TollingType, UserRole  # noqa: E402
 from app.models.highway import Highway  # noqa: E402
 from app.models.plaza import Plaza  # noqa: E402
 from app.models.user import User  # noqa: E402
-from main import app  # noqa: E402
 import app.models  # noqa: E402,F401
 
 

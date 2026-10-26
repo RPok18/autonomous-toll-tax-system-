@@ -26,6 +26,7 @@ from app.simulation.export import PASS_COLUMNS, write_pass_csv, write_rows_csv
 from app.simulation.metrics import aggregate, fusion_gain, summarise
 from app.simulation.runner import Registry, SimVehicle, process_pass, run_scenario
 from app.simulation.scenarios import SCENARIOS, Scenario, get_scenarios, threshold_sweep
+from app.toll.calculator import TollCalculator
 
 CAR_TOLL = Decimal("65.00")  # plaza-01 base rate for car_jeep_van
 
@@ -138,7 +139,7 @@ def test_case_4_insufficient_balance_is_refused_and_balance_is_unchanged():
 
 def test_settings_define_the_fusion_fields():
     s = Settings()
-    assert s.rfid_min_confidence == 0.5
+    assert s.rfid_min_confidence == 0.55
     assert s.fusion_primary_signal in ("rfid", "anpr")
 
 
@@ -154,26 +155,30 @@ def test_fusion_mode_switches_one_signal_off():
     v = car("MH12AB1234")
     tag = RFIDReadResult(v.tag_id, 0.95, 45.0, True)
     anpr = ANPRSignal("MH12AB1234", 0.93)
-    assert engine(mode="anpr_only").resolve(anpr, tag, v.plate).identification_method.value == "anpr_only"
-    assert engine(mode="rfid_only").resolve(anpr, tag, v.plate).identification_method.value == "rfid_only"
+    anpr_only = engine(mode="anpr_only").resolve(anpr, tag, v.plate)
+    rfid_only = engine(mode="rfid_only").resolve(anpr, tag, v.plate)
+    assert anpr_only.identification_method.value == "anpr_only"
+    assert anpr_only.tag_id is None
+    assert rfid_only.identification_method.value == "rfid_only"
+
+
+def test_fusion_engine_rejects_unknown_mode():
+    with pytest.raises(ValueError, match="Unsupported fusion mode"):
+        engine(mode="invalid")
 
 
 # ---- runner and metrics ---------------------------------------------------
 
-def _strip_timing(records):
-    return [{k: v for k, v in r.__dict__.items() if k != "decision_ms"} for r in records]
-
-
 def test_same_seed_gives_identical_results():
     a = run_scenario(SCENARIOS["S3"], seed=3, passes=400)
     b = run_scenario(SCENARIOS["S3"], seed=3, passes=400)
-    assert _strip_timing(a) == _strip_timing(b)
+    assert a == b
 
 
 def test_different_seeds_give_different_results():
     a = run_scenario(SCENARIOS["S3"], seed=1, passes=400)
     b = run_scenario(SCENARIOS["S3"], seed=2, passes=400)
-    assert _strip_timing(a) != _strip_timing(b)
+    assert a != b
 
 
 def test_outcome_rates_add_up_to_100_percent():
@@ -222,8 +227,39 @@ def test_unknown_scenario_is_rejected_with_the_known_ids():
 
 def test_all_selector_includes_the_threshold_sweep():
     ids = [s.scenario_id for s in get_scenarios("all")]
-    assert "S0" in ids and "S8b" in ids
+    assert "S0" in ids and "S8b" in ids and "S10" in ids
     assert len(threshold_sweep()) == 14 and "S9-S3-t0.85" in ids
+
+
+def test_unreadable_plate_scenario_routes_each_pass_to_exception():
+    records = run_scenario(SCENARIOS["S10"], seed=42, passes=10)
+    assert len(records) == 10
+    assert all(r.anpr_plate is None and r.fusion_exception for r in records)
+    assert all(r.charge_status == "unresolved" for r in records)
+
+
+def test_simulation_cli_prints_deterministic_per_vehicle_results(tmp_path, capsys):
+    from scripts.run_simulation import main
+
+    args = [
+        "--scenario", "S10", "--passes", "10", "--seeds", "42",
+        "--out-dir", str(tmp_path), "--per-pass",
+    ]
+    assert main(args) == 0
+    first_output = capsys.readouterr().out
+    first_files = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+    assert "vehicle=" in first_output and "route=exception" in first_output
+
+    assert main(args) == 0
+    assert capsys.readouterr().out == first_output
+    assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == first_files
+
+
+def test_simulated_toll_calculator_uses_policy_amount():
+    policy = PolicyEngine()
+    assert TollCalculator.calculate_simulated_amount(
+        policy, "plaza-01", VehicleClass.CAR_JEEP_VAN, CTX
+    ) == CAR_TOLL
 
 
 def test_negative_passes_are_rejected():

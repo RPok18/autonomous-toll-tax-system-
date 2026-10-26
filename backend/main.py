@@ -20,6 +20,16 @@ app.mount(
 )
 
 
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "name": settings.app_name,
+        "status": "ok",
+        "health": "/health",
+        "docs": "/docs",
+    }
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     init_db()
