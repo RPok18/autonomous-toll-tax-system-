@@ -28,6 +28,33 @@ from app.toll import TariffNotFoundError, TollCalculator
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
 
+def _log_failed_charge(
+    db: Session,
+    *,
+    actor: str,
+    plate_number: str,
+    plaza_code: str,
+    reason: str,
+    amount: Decimal | None = None,
+) -> None:
+    db.add(
+        AuditLog(
+            actor=actor,
+            action="charge_vehicle_toll_failed",
+            resource_type="toll_charge",
+            resource_id=plate_number,
+            metadata_json={
+                "plate_number": plate_number,
+                "plaza_code": plaza_code,
+                "amount_charged": str(amount) if amount is not None else None,
+                "reason": reason,
+            },
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+
 @router.post(
     "",
     response_model=VehicleRead,
@@ -89,6 +116,7 @@ def charge_vehicle(
     db: Session = Depends(get_db),
     identity: dict = Depends(require_role(UserRole.OPERATOR, UserRole.ADMIN)),
 ) -> TollChargeResponse:
+    actor = str(identity.get("sub") or identity.get("username") or "unknown")
     vehicle = (
         db.query(Vehicle)
         .filter_by(plate_number=payload.plate_number)
@@ -96,10 +124,24 @@ def charge_vehicle(
         .first()
     )
     if vehicle is None:
+        _log_failed_charge(
+            db,
+            actor=actor,
+            plate_number=payload.plate_number,
+            plaza_code=payload.plaza_code,
+            reason="Vehicle not found",
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found")
 
     plaza = db.query(Plaza).filter_by(plaza_code=payload.plaza_code, is_active=True).first()
     if plaza is None:
+        _log_failed_charge(
+            db,
+            actor=actor,
+            plate_number=vehicle.plate_number,
+            plaza_code=payload.plaza_code,
+            reason="Toll plaza not found",
+        )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Toll plaza not found")
 
     trip = Trip(
@@ -115,6 +157,13 @@ def charge_vehicle(
             identification_method=IdentificationMethod.MANUAL,
         )
     except TariffNotFoundError as exc:
+        _log_failed_charge(
+            db,
+            actor=actor,
+            plate_number=vehicle.plate_number,
+            plaza_code=payload.plaza_code,
+            reason="No applicable tariff found",
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No applicable tariff found",
@@ -122,6 +171,14 @@ def charge_vehicle(
 
     amount = Decimal(transaction.amount_charged).quantize(Decimal("0.01"))
     if vehicle.balance < amount:
+        _log_failed_charge(
+            db,
+            actor=actor,
+            plate_number=vehicle.plate_number,
+            plaza_code=payload.plaza_code,
+            amount=amount,
+            reason="Insufficient balance",
+        )
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Insufficient balance")
 
     vehicle.balance -= amount
@@ -131,7 +188,7 @@ def charge_vehicle(
 
     db.add(
         AuditLog(
-            actor=str(identity.get("sub") or identity.get("username") or "unknown"),
+            actor=actor,
             action="charge_vehicle_toll",
             resource_type="transaction",
             resource_id=str(transaction.transaction_id),
@@ -140,6 +197,7 @@ def charge_vehicle(
                 "amount_charged": str(amount),
                 "balance_after": str(vehicle.balance),
             },
+            created_at=datetime.now(timezone.utc),
         )
     )
     db.commit()
