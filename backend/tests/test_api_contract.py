@@ -373,6 +373,16 @@ def test_dashboard_static_assets_are_served(api_client):
     assert "text/css" in stylesheet.headers["content-type"]
 
 
+def test_audit_entries_have_no_mutation_api(api_client):
+    client, _ = api_client
+    paths = client.get("/openapi.json").json()["paths"]
+
+    assert not any(
+        "audit" in path.lower() and {"post", "put", "patch", "delete"} & operations.keys()
+        for path, operations in paths.items()
+    )
+
+
 @pytest.mark.parametrize(
     ("method", "path", "payload", "params", "expected_status"),
     [

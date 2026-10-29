@@ -13,6 +13,7 @@ from fastapi import HTTPException
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.api import vehicles as vehicle_api
+from app.models.audit import AuditLog
 from app.models.enums import PaymentStatus, VehicleClass
 from app.models.transaction import Transaction
 from app.models.vehicle import Vehicle
@@ -102,6 +103,14 @@ class FixedTollCalculator:
         )
 
 
+class MissingTariffCalculator:
+    def __init__(self, db):
+        self.db = db
+
+    def calculate(self, *args, **kwargs):
+        raise vehicle_api.TariffNotFoundError("missing tariff")
+
+
 def make_session(balance: str = "100.00") -> FakeSession:
     vehicle = SimpleNamespace(
         vehicle_id=uuid.uuid4(),
@@ -138,6 +147,12 @@ def test_toll_charge_creates_transaction_and_debits_balance(monkeypatch):
     assert result.balance_after == Decimal("35.00")
     assert result.transaction.amount_charged == Decimal("65.00")
     assert db.commit_count == 1
+    (audit_entry,) = [item for item in db.added if isinstance(item, AuditLog)]
+    assert audit_entry.actor == "operator"
+    assert audit_entry.action == "charge_vehicle_toll"
+    assert audit_entry.metadata_json["plate_number"] == "MH12AB1234"
+    assert audit_entry.metadata_json["amount_charged"] == "65.00"
+    assert audit_entry.created_at.tzinfo is not None
 
 
 def test_unknown_plate_returns_404_without_creating_transaction(monkeypatch):
@@ -155,7 +170,53 @@ def test_unknown_plate_returns_404_without_creating_transaction(monkeypatch):
     assert exc_info.value.status_code == 404
     assert exc_info.value.detail == "Vehicle not found"
     assert not any(isinstance(item, Transaction) for item in db.added)
-    assert db.commit_count == 0
+    assert db.commit_count == 1
+    (audit_entry,) = [item for item in db.added if isinstance(item, AuditLog)]
+    assert audit_entry.actor == "operator"
+    assert audit_entry.action == "charge_vehicle_toll_failed"
+    assert audit_entry.metadata_json == {
+        "plate_number": "XX00XX0000",
+        "plaza_code": "PLZ-A",
+        "amount_charged": None,
+        "reason": "Vehicle not found",
+    }
+    assert audit_entry.created_at.tzinfo is not None
+
+
+def test_unknown_plaza_is_audited(monkeypatch):
+    db = make_session()
+    db.plaza = None
+    monkeypatch.setattr(vehicle_api, "TollCalculator", FixedTollCalculator)
+
+    with pytest.raises(HTTPException) as exc_info:
+        vehicle_api.charge_vehicle(
+            TollChargeRequest(plate_number="MH12AB1234", plaza_code="PLZ-MISSING"),
+            db,
+            {"username": "operator"},
+        )
+
+    assert exc_info.value.status_code == 404
+    (audit_entry,) = [item for item in db.added if isinstance(item, AuditLog)]
+    assert audit_entry.metadata_json["reason"] == "Toll plaza not found"
+    assert audit_entry.metadata_json["plaza_code"] == "PLZ-MISSING"
+    assert db.commit_count == 1
+
+
+def test_missing_tariff_is_audited(monkeypatch):
+    db = make_session()
+    monkeypatch.setattr(vehicle_api, "TollCalculator", MissingTariffCalculator)
+
+    with pytest.raises(HTTPException) as exc_info:
+        vehicle_api.charge_vehicle(
+            TollChargeRequest(plate_number="MH12AB1234", plaza_code="PLZ-A"),
+            db,
+            {"username": "operator"},
+        )
+
+    assert exc_info.value.status_code == 404
+    (audit_entry,) = [item for item in db.added if isinstance(item, AuditLog)]
+    assert audit_entry.metadata_json["reason"] == "No applicable tariff found"
+    assert db.commit_count == 1
 
 
 def test_insufficient_balance_returns_402_without_debit_or_transaction(monkeypatch):
@@ -173,4 +234,14 @@ def test_insufficient_balance_returns_402_without_debit_or_transaction(monkeypat
     assert exc_info.value.detail == "Insufficient balance"
     assert db.vehicle.balance == Decimal("64.99")
     assert not any(isinstance(item, Transaction) for item in db.added)
-    assert db.commit_count == 0
+    assert db.commit_count == 1
+    (audit_entry,) = [item for item in db.added if isinstance(item, AuditLog)]
+    assert audit_entry.actor == "operator"
+    assert audit_entry.action == "charge_vehicle_toll_failed"
+    assert audit_entry.metadata_json == {
+        "plate_number": "MH12AB1234",
+        "plaza_code": "PLZ-A",
+        "amount_charged": "65.00",
+        "reason": "Insufficient balance",
+    }
+    assert audit_entry.created_at.tzinfo is not None
