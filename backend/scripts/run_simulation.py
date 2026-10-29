@@ -4,7 +4,7 @@ Examples (from the backend folder):
     python scripts/run_simulation.py --list
     python scripts/run_simulation.py --scenario S0 --passes 10000 --seeds 1-5
     python scripts/run_simulation.py --scenario all --out-dir simulation_results
-    python scripts/run_simulation.py --scenario S3 --seeds 1 --per-pass
+    python scripts/run_simulation.py --scenario S3 --seeds 1 --no-per-pass
 """
 from __future__ import annotations
 
@@ -16,7 +16,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.simulation.export import write_pass_csv, write_rows_csv  # noqa: E402
 from app.simulation.metrics import aggregate, fusion_gain, summarise  # noqa: E402
-from app.simulation.runner import PassRecord, run_scenario  # noqa: E402
+from app.simulation.report import PER_PASS_AUTO_LIMIT, want_per_pass, write_headline_csv  # noqa: E402
+from app.simulation.runner import run_scenario  # noqa: E402
 from app.simulation.scenarios import SCENARIOS, get_scenarios, threshold_sweep  # noqa: E402
 
 
@@ -35,24 +36,13 @@ def parse_seeds(text: str) -> list[int]:
 
 
 def print_table(rows: list[dict]) -> None:
-    header = f"{'scenario':<16}{'correct':>9}{'wrong':>8}{'silent':>8}{'unres.':>8}{'exc.':>8}"
+    header = f"{'scenario':<16}{'correct':>9}{'wrong':>8}{'silent':>8}{'unres.':>8}{'exc.':>8}{'p95 ms':>9}"
     print(header)
     print("-" * len(header))
     for r in rows:
         print(f"{r['scenario']:<16}{r['correct_pct']:>9.2f}{r['wrong_pct']:>8.2f}"
               f"{r['silent_wrong_pct']:>8.2f}{r['unresolved_pct']:>8.2f}"
-              f"{r['exception_pct']:>8.2f}")
-
-
-def print_passes(scenario: str, seed: int, records: list[PassRecord]) -> None:
-    for record in records:
-        route = "exception" if record.fusion_exception else "charge"
-        print(
-            f"{scenario} seed={seed} pass={record.pass_no} vehicle={record.true_plate} "
-            f"anpr={record.anpr_plate or 'unreadable'} method={record.method} "
-            f"route={route} status={record.charge_status} "
-            f"charged={record.charged_amount:.2f}"
-        )
+              f"{r['exception_pct']:>8.2f}{r['latency_p95_ms']:>9.1f}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -61,7 +51,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--passes", type=int, default=10000, help="passes per scenario and seed")
     ap.add_argument("--seeds", default="1-5", help='e.g. "1-5" or "1,3,7"')
     ap.add_argument("--out-dir", default="simulation_results")
-    ap.add_argument("--per-pass", action="store_true", help="also write one CSV row per pass")
+    ap.add_argument("--per-pass", action="store_true",
+                    help=f"always write one CSV row per pass (default: only up to {PER_PASS_AUTO_LIMIT} passes in total)")
+    ap.add_argument("--no-per-pass", action="store_true", help="never write the per-pass CSV files")
     ap.add_argument("--list", action="store_true", help="list scenarios and exit")
     args = ap.parse_args(argv)
 
@@ -81,19 +73,25 @@ def main(argv: list[str] | None = None) -> int:
         print("error: --passes must not be negative", file=sys.stderr)
         return 2
 
+    try:
+        per_pass = want_per_pass(args.per_pass, args.no_per_pass, len(scenarios) * len(seeds) * args.passes)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
     out_dir = Path(args.out_dir)
     summaries: list[dict] = []
     for sc in scenarios:
         for seed in seeds:
             records = run_scenario(sc, seed, args.passes)
             summaries.append(summarise(records, sc.scenario_id, seed))
-            if args.per_pass:
+            if per_pass:
                 write_pass_csv(out_dir / f"passes_{sc.scenario_id}_seed{seed}.csv", records)
-                print_passes(sc.scenario_id, seed, records)
 
     by_scenario = aggregate(summaries)
     write_rows_csv(out_dir / "summary.csv", summaries)
     write_rows_csv(out_dir / "summary_by_scenario.csv", by_scenario)
+    write_headline_csv(out_dir / "metrics_summary.csv", by_scenario)
     gain = fusion_gain(by_scenario)
     if gain is not None:
         write_rows_csv(out_dir / "fusion_gain.csv", [{"fusion_gain_points": gain}])
@@ -101,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
     print_table(by_scenario)
     if gain is not None:
         print(f"\nFusion gain (S0 minus the better of S1 and S2): {gain:.2f} points")
+    if not per_pass:
+        print("\nPer-pass CSV files not written (run is large or --no-per-pass); use --per-pass to force them.")
     print(f"\nWrote results to {out_dir.resolve()}")
     return 0
 

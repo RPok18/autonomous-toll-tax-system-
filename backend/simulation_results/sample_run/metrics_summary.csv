@@ -1,0 +1,2 @@
+scenario,seeds,passes,correct_identification_pct,toll_deduction_correctness_pct,latency_p50_ms,latency_p95_ms,exception_pct,exceptions_per_1000
+S0,1,1000,98.0,100.0,44.515,59.105,2.4,24.0
