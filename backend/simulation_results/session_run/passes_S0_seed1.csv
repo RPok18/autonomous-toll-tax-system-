@@ -1,0 +1,1 @@
+pass_no,true_plate,carried_tag,vehicle_class,hour,anpr_plate,anpr_confidence,rfid_tag,rfid_confidence,rfid_latency_ms,method,resolved_plate,fusion_exception,notes,outcome,silent_wrong,charge_status,expected_amount,charged_amount,charged_to_true_vehicle,balance_delta_ok
