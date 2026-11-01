@@ -1,0 +1,6 @@
+pass_no,true_plate,carried_tag,vehicle_class,hour,anpr_plate,anpr_confidence,rfid_tag,rfid_confidence,rfid_latency_ms,method,resolved_plate,fusion_exception,notes,outcome,silent_wrong,charge_status,expected_amount,charged_amount,charged_to_true_vehicle,balance_delta_ok
+0,MH12AB1264,TAGMH12AB1264,car_jeep_van,7,MH12AB1264,0.962,TAGMH12AB1264,0.88,43.703,hybrid_agreed,MH12AB1264,False,anpr_rfid_agree,correct,False,paid,65.0,65.0,True,True
+1,MH12AB1243,TAGMH12AB1243,car_jeep_van,5,MH12AB1243,0.935,TAGMH12AB1243,0.94,43.444,hybrid_agreed,MH12AB1243,False,anpr_rfid_agree,correct,False,paid,65.0,65.0,True,True
+2,MH12AB1000,,car_jeep_van,11,MH12AB1000,0.892,,0.0,47.991,anpr_only,MH12AB1000,False,anpr_only,correct,False,paid,65.0,65.0,True,True
+3,MH12AB1333,TAGMH12AB1333,two_wheeler,18,MH12AB1333,0.854,TAGMH12AB1333,0.85,42.594,hybrid_agreed,MH12AB1333,False,anpr_rfid_agree,correct,False,paid,0.0,0.0,True,True
+4,MH12AB1460,TAGMH12AB1460,car_jeep_van,4,MH12AB1460,0.958,TAGMH12AB1460,0.88,47.091,hybrid_agreed,MH12AB1460,False,anpr_rfid_agree,correct,False,paid,65.0,65.0,True,True

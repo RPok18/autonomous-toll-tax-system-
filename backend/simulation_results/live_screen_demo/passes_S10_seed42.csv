@@ -1,0 +1,6 @@
+pass_no,true_plate,carried_tag,vehicle_class,hour,anpr_plate,anpr_confidence,rfid_tag,rfid_confidence,rfid_latency_ms,method,resolved_plate,fusion_exception,notes,outcome,silent_wrong,charge_status,expected_amount,charged_amount,charged_to_true_vehicle,balance_delta_ok
+0,MH12AB1264,,car_jeep_van,7,,0.0,,0.0,43.703,unresolved,,True,no_usable_signal,unresolved,False,unresolved,65.0,0.0,False,False
+1,MH12AB1297,,car_jeep_van,5,,0.0,,0.0,43.444,unresolved,,True,no_usable_signal,unresolved,False,unresolved,65.0,0.0,False,False
+2,MH12AB1090,,car_jeep_van,11,,0.0,,0.0,43.998,unresolved,,True,no_usable_signal,unresolved,False,unresolved,65.0,0.0,False,False
+3,MH12AB1236,,car_jeep_van,18,,0.0,,0.0,51.318,unresolved,,True,no_usable_signal,unresolved,False,unresolved,65.0,0.0,False,False
+4,MH12AB1137,,car_jeep_van,4,,0.0,,0.0,43.852,unresolved,,True,no_usable_signal,unresolved,False,unresolved,65.0,0.0,False,False
