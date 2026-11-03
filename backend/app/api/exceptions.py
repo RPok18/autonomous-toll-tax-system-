@@ -10,7 +10,7 @@ from app.database import get_db
 from app.api.deps import require_role
 from app.models.enums import UserRole
 from app.models.exception import ExceptionRecord
-from app.schemas.exception import ExceptionCreate, ExceptionRead
+from app.schemas.exception import ExceptionCreate, ExceptionRead, ExceptionResolve
 
 router = APIRouter(prefix="/exceptions", tags=["exceptions"])
 
@@ -79,14 +79,19 @@ def list_exceptions(
 )
 def resolve_exception(
     exception_id: uuid.UUID,
+    payload: ExceptionResolve,
     db: Session = Depends(get_db),
     identity=Depends(require_role(UserRole.OPERATOR, UserRole.ADMIN)),
 ) -> ExceptionRecord:
     exception = db.query(ExceptionRecord).filter_by(exception_id=exception_id).first()
     if exception is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exception not found")
+    if exception.resolved:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exception already resolved")
 
     exception.resolved = True
+    exception.resolved_at = datetime.now(timezone.utc)
+    exception.resolution_note = payload.resolution_note
     db.commit()
     db.refresh(exception)
 
@@ -96,5 +101,6 @@ def resolve_exception(
         action="resolve_exception",
         resource_type="exception",
         resource_id=str(exception_id),
+        metadata={"resolution_note": exception.resolution_note},
     )
     return exception
