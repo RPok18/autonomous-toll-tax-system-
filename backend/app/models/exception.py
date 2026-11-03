@@ -22,6 +22,7 @@ class ExceptionRecord(Base):
     details = Column(Text, nullable=True)
     resolved = Column(Boolean, default=False)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
+    resolution_note = Column(String(1000), nullable=True)
     image_path = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

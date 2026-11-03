@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     # Default assumes the docker-compose Postgres service. Override via
     # DATABASE_URL in .env for a different host/user/db.
     database_url: str = "postgresql+psycopg://toll_app:toll_app@localhost:5432/toll_system"
+    plate_image_dir: str = "media/plate_captures"
+    max_plate_image_bytes: int = 5 * 1024 * 1024
 
     # P1 - ANPR
     anpr_device: str = "cpu"  # "cpu" or "cuda:0" for RTX 2050 4GB

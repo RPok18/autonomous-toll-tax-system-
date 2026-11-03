@@ -343,7 +343,7 @@ def api_client(monkeypatch: pytest.MonkeyPatch):
         ("GET", "/exceptions", None, {"resolved": "false"}, 200),
         ("GET", "/plazas", None, None, 200),
         ("GET", "/dashboard/", None, None, 200),
-        ("PATCH", f"/exceptions/{EXCEPTION_ID}/resolve", None, None, 200),
+        ("PATCH", f"/exceptions/{EXCEPTION_ID}/resolve", {"resolution_note": "Reviewed by operator"}, None, 200),
         ("GET", "/health", None, None, 200),
     ],
 )
@@ -409,7 +409,7 @@ def test_audit_entries_have_no_mutation_api(api_client):
         ("POST", "/exceptions", {"details": "Missing type"}, None, 422),
         ("GET", f"/exceptions/{MISSING_ID}", None, None, 404),
         ("GET", "/exceptions", None, {"resolved": "not-a-boolean"}, 422),
-        ("PATCH", f"/exceptions/{MISSING_ID}/resolve", None, None, 404),
+        ("PATCH", f"/exceptions/{MISSING_ID}/resolve", {"resolution_note": "Reviewed"}, None, 404),
         ("POST", "/health", None, None, 405),
     ],
 )

@@ -53,6 +53,7 @@ tbody tr.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .state.full { padding: 90px 12px; font-size: 16px; }
 .banner { background: color-mix(in srgb, var(--bad) 14%, transparent); border: 1px solid var(--bad); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; display: flex; gap: 12px; align-items: center; }
 .banner .spacer { flex: 1; }
+.notice { background: color-mix(in srgb, var(--ok) 14%, transparent); border: 1px solid var(--ok); border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; }
 .skeleton td { color: transparent; }
 .skeleton td::before { content: ""; display: block; height: 12px; border-radius: 6px; background: var(--line); opacity: .6; }
 .stale { opacity: .55; }
@@ -61,3 +62,7 @@ tbody tr.sel { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .login h1 { margin-bottom: 14px; }
 .login label { display: block; margin-bottom: 10px; color: var(--muted); }
 .login input { width: 100%; margin-top: 4px; }
+textarea { display: block; width: 100%; max-width: 720px; margin: 6px 0 10px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: inherit; resize: vertical; }
+.resolution { margin-top: 14px; }
+.exception-image { display: block; max-width: min(100%, 520px); max-height: 280px; margin-top: 14px; object-fit: contain; border: 1px solid var(--line); background: var(--bg); }
+.image-unavailable { margin-top: 14px; padding: 28px 12px; max-width: 520px; text-align: center; color: var(--muted); border: 1px dashed var(--line); }

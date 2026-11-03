@@ -20,7 +20,6 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column("exceptions", sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column("exceptions", sa.Column("image_path", sa.String(length=255), nullable=True))
-    # Exceptions resolved before this column existed: use their creation time as the best estimate.
     op.execute("UPDATE exceptions SET resolved_at = created_at WHERE resolved IS TRUE AND resolved_at IS NULL")
 
 

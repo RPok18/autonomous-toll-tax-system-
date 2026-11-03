@@ -204,11 +204,22 @@ def test_a_stored_name_that_is_not_server_generated_is_never_served(client, auth
 def test_resolving_sets_resolved_at_once(client, auth, db, seed):
     record = add_exception(db, seed)
 
-    first = client.patch(f"/exceptions/{record.exception_id}/resolve", headers=auth("operator")).json()
-    second = client.patch(f"/exceptions/{record.exception_id}/resolve", headers=auth("operator")).json()
+    first = client.patch(
+        f"/exceptions/{record.exception_id}/resolve",
+        json={"resolution_note": "Reviewed against the lane record."},
+        headers=auth("operator"),
+    ).json()
+    second = client.patch(
+        f"/exceptions/{record.exception_id}/resolve",
+        json={"resolution_note": "A different note must not overwrite the original."},
+        headers=auth("operator"),
+    )
 
     assert first["resolved_at"] is not None
-    assert second["resolved_at"] == first["resolved_at"]  # resolving again must not restart the retention clock
+    assert second.status_code == 409
+    db.refresh(record)
+    assert record.resolved_at.isoformat().replace("+00:00", "Z") == first["resolved_at"].replace("+00:00", "Z")
+    assert record.resolution_note == first["resolution_note"]
 
 
 def test_an_exception_created_as_resolved_gets_resolved_at(client, auth, seed):
@@ -220,3 +231,54 @@ def test_an_exception_created_as_resolved_gets_resolved_at(client, auth, seed):
 
     assert response.status_code == 201
     assert response.json()["resolved_at"] is not None
+
+
+@pytest.mark.parametrize("note", ["", "   ", "x" * 1001])
+def test_resolution_note_is_required_trimmed_and_bounded(client, auth, db, seed, note):
+    record = add_exception(db, seed)
+
+    response = client.patch(
+        f"/exceptions/{record.exception_id}/resolve",
+        json={"resolution_note": note},
+        headers=auth("operator"),
+    )
+
+    assert response.status_code == 422
+    db.refresh(record)
+    assert record.resolved is False
+    assert record.resolution_note is None
+
+
+def test_resolution_note_is_trimmed_persisted_and_audited(client, auth, db, seed):
+    record = add_exception(db, seed)
+
+    response = client.patch(
+        f"/exceptions/{record.exception_id}/resolve",
+        json={"resolution_note": "  Confirmed by lane camera  "},
+        headers=auth("operator"),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["resolution_note"] == "Confirmed by lane camera"
+    db.refresh(record)
+    assert record.resolution_note == "Confirmed by lane camera"
+    rows = audit_rows(db, "resolve_exception")
+    assert len(rows) == 1
+    assert rows[0].resource_id == str(record.exception_id)
+    assert rows[0].metadata_json["resolution_note"] == "Confirmed by lane camera"
+
+
+@pytest.mark.parametrize("role", ["viewer", "auditor"])
+def test_read_only_roles_cannot_resolve_or_change_the_note(client, auth, db, seed, role):
+    record = add_exception(db, seed)
+
+    response = client.patch(
+        f"/exceptions/{record.exception_id}/resolve",
+        json={"resolution_note": "Should be rejected"},
+        headers=auth(role),
+    )
+
+    assert response.status_code == 403
+    db.refresh(record)
+    assert record.resolved is False
+    assert record.resolution_note is None

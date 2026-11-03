@@ -30,7 +30,7 @@ const state = {
   ex: { status: "open", plaza_id: "", exception_type: "", transaction_id: "", limit: 50, offset: 0 },
   rows: [], total: null, selectedId: null,
   loading: false, error: null, loaded: false, loadedAt: null, forbidden: false, notice: "",
-  plazaError: null, actionError: {},
+  plazaError: null, actionError: {}, resolutionNotes: {},
 };
 let timer = null;
 let reqSeq = 0;
@@ -199,10 +199,27 @@ window.addEventListener("hashchange", () => {
 
 async function resolve(rec) {
   state.actionError[rec.exception_id] = "";
+  const note = (state.resolutionNotes[rec.exception_id] || "").trim();
+  if (!note) {
+    state.actionError[rec.exception_id] = "Enter a resolution note.";
+    render(true);
+    return;
+  }
+  if (note.length > 1000) {
+    state.actionError[rec.exception_id] = "Resolution note must be 1000 characters or fewer.";
+    render(true);
+    return;
+  }
   try {
-    const res = await api("/exceptions/" + rec.exception_id + "/resolve", { method: "PATCH" });
+    const res = await api("/exceptions/" + rec.exception_id + "/resolve", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resolution_note: note }),
+    });
     if (res.ok) {
       const updated = await res.json();
+      state.notice = "Exception resolved.";
+      delete state.resolutionNotes[rec.exception_id];
       if (state.ex.status === "open") {
         state.rows = state.rows.filter((row) => row.exception_id !== updated.exception_id);
         state.total = Math.max(0, (state.total || 0) - 1);
@@ -216,7 +233,10 @@ async function resolve(rec) {
         replaceRow(updated);
       }
     }
-    else state.actionError[rec.exception_id] = res.status === 404 ? "This exception no longer exists." : "Could not resolve (" + res.status + ").";
+    else if (res.status === 403) state.actionError[rec.exception_id] = "You do not have permission to resolve exceptions.";
+    else if (res.status === 404) state.actionError[rec.exception_id] = "This exception no longer exists.";
+    else if (res.status === 409) state.actionError[rec.exception_id] = "This exception was already resolved.";
+    else state.actionError[rec.exception_id] = res.status === 422 ? "Resolution note must be 1–1000 non-blank characters." : "Could not resolve (" + res.status + ").";
   } catch (e) { if (e.message !== "401") state.actionError[rec.exception_id] = "Could not resolve. Check the connection."; }
   render(true);
 }
@@ -371,13 +391,14 @@ function exceptionsView() {
       el("td", {}, orDash(r.lane_id)), el("td", {}, orDash(r.details)),
       el("td", {}, r.transaction_id ? el("a", { href: "#/transactions?transaction_id=" + r.transaction_id, title: r.transaction_id, onclick: (e) => e.stopPropagation() }, "open pass ↗") : DASH),
       el("td", {}, badge(r.resolved ? "resolved" : "open", r.resolved ? "Resolved" : "Open")),
-      el("td", {}, canWrite() && !r.resolved ? el("button", { onclick: (e) => { e.stopPropagation(); resolve(r); } }, "Resolve") : null,
+      el("td", {}, canWrite() && !r.resolved ? el("button", { onclick: (e) => { e.stopPropagation(); state.selectedId = r.exception_id; render(true); } }, "Review") : null,
         state.actionError[r.exception_id] ? el("div", { class: "err" }, state.actionError[r.exception_id]) : null));
   };
   const selected = state.rows.find((r) => r.exception_id === state.selectedId);
   const open = state.total !== null && f.status === "open" ? el("strong", { style: "color:var(--bad)" }, state.total + " open") : null;
   return [
     el("h1", {}, "Exceptions"), el("div", { class: "sub" }, "Passes that need a person, newest first"),
+    state.notice ? el("div", { class: "notice" }, state.notice) : null,
     state.plazaError ? el("div", { class: "banner" }, state.plazaError) : null,
     el("div", { class: "filters" }, el("label", {}, "Status", seg), plazaSelect(f), el("label", {}, "Type", type), limitSelect(f), open,
       f.transaction_id ? el("span", { class: "chip" }, "One pass only", el("button", { class: "link", onclick: () => go("exceptions") }, "✕")) : null,
@@ -387,6 +408,19 @@ function exceptionsView() {
 }
 function exceptionPanel(r) {
   const kv = (k, v) => el("div", {}, el("div", { class: "k" }, k), el("div", { class: "v" }, v));
+  const note = el("textarea", {
+    rows: 4, maxlength: 1000, placeholder: "How was this exception resolved?",
+    value: state.resolutionNotes[r.exception_id] || "",
+    oninput: () => { state.resolutionNotes[r.exception_id] = note.value; },
+  });
+  const image = r.has_image
+    ? el("img", {
+      class: "exception-image", src: "/exceptions/" + r.exception_id + "/image", alt: "Plate crop",
+      onerror: (event) => {
+        event.currentTarget.replaceWith(el("div", { class: "image-unavailable" }, "Image unavailable"));
+      },
+    })
+    : el("div", { class: "image-unavailable" }, "Image unavailable");
   return el("div", { class: "panel" },
     el("h2", {}, "Selected exception · " + label("exception_type", r.exception_type) + " · " + plazaName(r.plaza_id) + " · " + orDash(r.lane_id)),
     el("div", { class: "grid" },
@@ -394,6 +428,11 @@ function exceptionPanel(r) {
       kv("Status", r.resolved ? "Resolved" : "Open"),
       kv("Details", orDash(r.details)),
       kv("Transaction", r.transaction_id || DASH)),
+    image,
+    !r.resolved ? el("div", { class: "resolution" },
+      el("label", {}, "Resolution note", note),
+      canWrite() ? el("button", { class: "primary", onclick: () => resolve(r) }, "Resolve exception") : null) : null,
+    r.resolution_note ? el("p", { class: "small" }, "Resolution: " + r.resolution_note) : null,
     state.actionError[r.exception_id] ? el("div", { class: "err" }, state.actionError[r.exception_id]) : null);
 }
 
