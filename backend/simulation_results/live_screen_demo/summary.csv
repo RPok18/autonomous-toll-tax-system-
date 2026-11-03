@@ -1,0 +1,4 @@
+scenario,seed,passes,correct_pct,wrong_pct,silent_wrong_pct,unresolved_pct,exception_pct,exceptions_per_1000,unknown_plate_pct,method_anpr_only_pct,method_rfid_only_pct,method_hybrid_agreed_pct,method_hybrid_rfid_primary_pct,method_hybrid_anpr_primary_pct,method_unresolved_pct,toll_deduction_correctness_pct,misbilled_share_pct,missed_revenue_share_pct,latency_p50_ms,latency_p95_ms
+S0,42,5,100.0,0.0,0.0,0.0,0.0,0.0,0.0,20.0,0.0,80.0,0.0,0.0,0.0,100.0,0.0,0.0,43.703,47.991
+S3,42,5,80.0,20.0,20.0,0.0,0.0,0.0,20.0,20.0,0.0,80.0,0.0,0.0,0.0,100.0,0.0,25.0,43.703,47.991
+S10,42,5,0.0,0.0,0.0,100.0,100.0,1000.0,0.0,0.0,0.0,0.0,0.0,0.0,100.0,0.0,0.0,100.0,43.852,51.318

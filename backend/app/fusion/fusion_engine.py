@@ -33,6 +33,8 @@ class FusionEngine:
 
     def __init__(self, settings=None):
         self.settings = settings or get_settings()
+        if self.settings.fusion_mode not in {"hybrid", "anpr_only", "rfid_only"}:
+            raise ValueError(f"Unsupported fusion mode: {self.settings.fusion_mode}")
 
     def resolve(
         self,
@@ -41,13 +43,17 @@ class FusionEngine:
         registered_plate_for_tag: str | None = None,
     ) -> FusionResult:
         notes: list[str] = []
+        anpr_enabled = self.settings.fusion_mode != "rfid_only"
+        rfid_enabled = self.settings.fusion_mode != "anpr_only"
 
         anpr_ok = (
-            anpr.plate_number is not None
+            anpr_enabled
+            and anpr.plate_number is not None
             and anpr.confidence >= self.settings.anpr_min_confidence
         )
         rfid_ok = (
-            rfid.tag_id is not None
+            rfid_enabled
+            and rfid.tag_id is not None
             and rfid.tag_registered
             and rfid.confidence >= self.settings.rfid_min_confidence
         )
@@ -108,7 +114,7 @@ class FusionEngine:
             return FusionResult(
                 identification_method=IdentificationMethod.ANPR_ONLY,
                 plate_number=anpr.plate_number,
-                tag_id=rfid.tag_id,
+                tag_id=rfid.tag_id if rfid_enabled else None,
                 confidence=anpr.confidence,
                 is_exception=False,
                 notes=notes,

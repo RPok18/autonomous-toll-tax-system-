@@ -36,6 +36,7 @@ class Transaction(Base):
     discount_amount = Column(Numeric(10, 2), nullable=False, default=0)
     surcharge_amount = Column(Numeric(10, 2), nullable=False, default=0)
     amount_charged = Column(Numeric(10, 2), nullable=False, default=0)
+    balance_after_payment = Column(Numeric(10, 2), nullable=True)
     currency = Column(String(3), nullable=False, default="INR")
     payment_status = Column(pg_enum(PaymentStatus, "payment_status"), nullable=False, default=PaymentStatus.PENDING)
 

@@ -28,5 +28,9 @@ class ExceptionRecord(Base):
 
     transaction = relationship("Transaction", back_populates="exceptions")
 
+    @property
+    def has_image(self) -> bool:
+        return self.image_path is not None
+
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Exception {self.exception_type} tx={self.transaction_id}>"

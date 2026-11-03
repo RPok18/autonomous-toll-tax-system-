@@ -6,12 +6,13 @@ from decimal import Decimal
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from app.models.enums import IdentificationMethod, PaymentStatus
+from app.models.enums import IdentificationMethod, PaymentStatus, VehicleClass
 from app.models.plaza import Plaza
 from app.models.tariff import Tariff
 from app.models.transaction import Transaction
 from app.models.trip import Trip
 from app.models.vehicle import Vehicle
+from app.policy.rules_engine import PolicyEngine, TollContext
 
 # Standard night-surcharge window used by most Indian toll plazas.
 NIGHT_START = time(22, 0)
@@ -32,6 +33,16 @@ class TollCalculator:
 
     def __init__(self, db: Session):
         self.db = db
+
+    @staticmethod
+    def calculate_simulated_amount(
+        policy: PolicyEngine,
+        plaza_id: str,
+        vehicle_class: VehicleClass,
+        context: TollContext,
+    ) -> Decimal:
+        """Return the configured policy amount for a simulated vehicle pass."""
+        return Decimal(str(policy.compute(plaza_id, vehicle_class, context).amount_charged))
 
     def calculate(
         self,

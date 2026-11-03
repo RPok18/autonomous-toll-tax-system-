@@ -31,6 +31,7 @@ class TransactionCreate(BaseModel):
     discount_amount: Decimal = Decimal("0")
     surcharge_amount: Decimal = Decimal("0")
     amount_charged: Decimal = Decimal("0")
+    balance_after_payment: Decimal | None = None
     currency: str = "INR"
     payment_status: PaymentStatus = PaymentStatus.PENDING
 
@@ -60,6 +61,7 @@ class TransactionRead(ORMBase):
     discount_amount: Decimal
     surcharge_amount: Decimal
     amount_charged: Decimal
+    balance_after_payment: Decimal | None
     currency: str
     payment_status: PaymentStatus
 

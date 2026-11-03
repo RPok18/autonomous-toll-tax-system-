@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from ultralytics import YOLO
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PLATES_DIR = REPO_ROOT / "plates"
 
 
 def main():
-    model = YOLO("yolov8n.pt")  # pretrained COCO weights, fine-tuned from here
+    model = YOLO(str(REPO_ROOT / "backend" / "yolov8n.pt"))
     model.train(
-        data=r"E:\plates\yolo_dataset\data.yaml",
+        data=str(PLATES_DIR / "yolo_dataset" / "data.yaml"),
         epochs=80,
         imgsz=640,
         batch=8,
-        project=r"E:\plates\yolo_runs",
+        project=str(PLATES_DIR / "yolo_runs"),
         name="plate_detector",
     )
 
