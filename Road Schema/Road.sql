@@ -247,6 +247,7 @@ CREATE TABLE transactions (
     discount_amount      NUMERIC(10,2) NOT NULL DEFAULT 0,
     surcharge_amount     NUMERIC(10,2) NOT NULL DEFAULT 0,
     amount_charged       NUMERIC(10,2) NOT NULL DEFAULT 0,
+    balance_after_payment NUMERIC(10,2),
     currency             CHAR(3) NOT NULL DEFAULT 'INR',
     payment_status       payment_status NOT NULL DEFAULT 'pending',
 
