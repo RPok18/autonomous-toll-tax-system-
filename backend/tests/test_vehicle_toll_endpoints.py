@@ -137,6 +137,7 @@ def test_toll_charge_creates_transaction_and_debits_balance(monkeypatch):
     assert db.vehicle.balance == Decimal("35.00")
     assert result.balance_after == Decimal("35.00")
     assert result.transaction.amount_charged == Decimal("65.00")
+    assert transactions[0].balance_after_payment == Decimal("35.00")
     assert db.commit_count == 1
 
 

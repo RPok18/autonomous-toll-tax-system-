@@ -126,6 +126,7 @@ def charge_vehicle(
 
     vehicle.balance -= amount
     transaction.payment_status = PaymentStatus.PAID
+    transaction.balance_after_payment = vehicle.balance
     db.add(transaction)
     db.flush()
 
