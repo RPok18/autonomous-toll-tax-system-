@@ -51,6 +51,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--passes", type=int, default=10000, help="passes per scenario and seed")
     ap.add_argument("--seeds", default="1-5", help='e.g. "1-5" or "1,3,7"')
     ap.add_argument("--out-dir", default="simulation_results")
+    ap.add_argument(
+        "--persist-to-db",
+        action="store_true",
+        help="also save simulated passes as clearly marked demo records at the seeded plaza",
+    )
+    ap.add_argument(
+        "--plaza-code",
+        default="PLZ-A",
+        help="active seeded plaza used with --persist-to-db (default: PLZ-A)",
+    )
     ap.add_argument("--per-pass", action="store_true",
                     help=f"always write one CSV row per pass (default: only up to {PER_PASS_AUTO_LIMIT} passes in total)")
     ap.add_argument("--no-per-pass", action="store_true", help="never write the per-pass CSV files")
@@ -87,6 +97,19 @@ def main(argv: list[str] | None = None) -> int:
             summaries.append(summarise(records, sc.scenario_id, seed))
             if per_pass:
                 write_pass_csv(out_dir / f"passes_{sc.scenario_id}_seed{seed}.csv", records)
+            if args.persist_to_db:
+                from app.database import SessionLocal
+                from app.simulation.persistence import persist_simulation_passes
+
+                with SessionLocal() as db:
+                    saved = persist_simulation_passes(
+                        db,
+                        records,
+                        plaza_code=args.plaza_code,
+                        scenario=sc.scenario_id,
+                        seed=seed,
+                    )
+                print(f"Persisted {saved} new demo passes for {sc.scenario_id}, seed {seed}.")
 
     by_scenario = aggregate(summaries)
     write_rows_csv(out_dir / "summary.csv", summaries)

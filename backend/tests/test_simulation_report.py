@@ -107,6 +107,35 @@ def test_no_per_pass_flag_skips_the_vehicle_files(tmp_path):
     assert (tmp_path / "metrics_summary.csv").exists()
 
 
+def test_persist_flag_sends_generated_records_to_database(tmp_path, monkeypatch):
+    import app.database
+    import app.simulation.persistence
+
+    class FakeSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    calls = []
+    monkeypatch.setattr(app.database, "SessionLocal", FakeSession)
+    monkeypatch.setattr(
+        app.simulation.persistence,
+        "persist_simulation_passes",
+        lambda db, records, **kwargs: calls.append((records, kwargs)) or len(records),
+    )
+
+    assert run_cli(
+        tmp_path, "--scenario", "S0", "--passes", "3", "--seeds", "42",
+        "--persist-to-db",
+    ) == 0
+    assert len(calls) == 1
+    records, options = calls[0]
+    assert len(records) == 3
+    assert options == {"plaza_code": "PLZ-A", "scenario": "S0", "seed": 42}
+
+
 def test_both_per_pass_flags_together_are_a_usage_error(tmp_path, capsys):
     assert run_cli(tmp_path, "--passes", "5", "--per-pass", "--no-per-pass") == 2
     assert "cannot be used together" in capsys.readouterr().err
