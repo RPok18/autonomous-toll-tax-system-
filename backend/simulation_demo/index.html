@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live ANPR + RFID simulation</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">AUTONOMOUS TOLL TAX SYSTEM</p>
+        <h1>Live roadside simulation</h1>
+        <p class="muted">Watch ANPR and RFID signals become a toll decision, one vehicle at a time.</p>
+      </div>
+      <a href="/dashboard/">Operations dashboard</a>
+    </header>
+    <section class="controls">
+      <label>Scenario
+        <select id="scenario">
+          <option value="S0">S0 - Baseline</option>
+          <option value="S3">S3 - Night or rain</option>
+          <option value="S5">S5 - RFID degraded</option>
+          <option value="S8">S8 - Cloned tags</option>
+          <option value="S10">S10 - Unreadable plates</option>
+        </select>
+      </label>
+      <label>Vehicle passes <input id="passes" type="number" min="1" max="500" value="30"></label>
+      <label>Seed <input id="seed" type="number" min="0" value="42"></label>
+      <button id="start">Start live run</button>
+      <span id="status" class="muted">Ready</span>
+    </section>
+    <section class="hero">
+      <div><strong id="scenarioName">Ready for a run</strong><span id="scenarioDescription" class="muted"></span></div>
+      <div class="progress"><div id="progressBar"></div></div>
+      <span id="progressText">0 / 0</span>
+    </section>
+    <section class="cards">
+      <div class="card"><span>Correct</span><strong id="correct">0</strong></div>
+      <div class="card"><span>Exceptions</span><strong id="exceptions">0</strong></div>
+      <div class="card"><span>Paid</span><strong id="paid">0</strong></div>
+      <div class="card"><span>Charged</span><strong id="charged">₹0.00</strong></div>
+      <div class="card"><span>Avg RFID latency</span><strong id="latency">0 ms</strong></div>
+    </section>
+    <section class="grid">
+      <div class="panel">
+        <h2>Identification outcomes</h2>
+        <div class="bar-row"><span>Correct</span><div class="bar"><i id="correctBar"></i></div><b id="correctPct">0%</b></div>
+        <div class="bar-row"><span>Wrong</span><div class="bar"><i id="wrongBar" class="bad"></i></div><b id="wrongPct">0%</b></div>
+        <div class="bar-row"><span>Unresolved</span><div class="bar"><i id="unresolvedBar" class="warn"></i></div><b id="unresolvedPct">0%</b></div>
+      </div>
+      <div class="panel">
+        <h2>Live vehicle decisions</h2>
+        <div id="feed" class="feed"><p class="muted">Press “Start live run” to begin.</p></div>
+      </div>
+    </section>
+    <section id="summary" class="panel hidden"></section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

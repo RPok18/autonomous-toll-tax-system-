@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YOLO training replay</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">ANPR MODEL DEVELOPMENT</p>
+        <h1>YOLO plate-detector training</h1>
+        <p class="muted">Run the actual YOLO plate detector training and watch its real metrics arrive.</p>
+      </div>
+      <a href="/simulation-demo/">Live toll simulation</a>
+    </header>
+    <div class="notice"><b>Presentation note:</b> this starts real CPU training on the project dataset. Use 3–5 epochs for a short demonstration; use 80 for the full experiment.</div>
+    <section class="controls">
+      <label>Recorded run
+        <select id="epochs"><option value="3">3 epochs · quick demo</option><option value="5" selected>5 epochs · recommended</option><option value="80">80 epochs · full run</option></select>
+      </label>
+      <button id="start">Start training</button><span id="status" class="muted">Ready</span>
+    </section>
+    <section class="hero">
+      <div><strong id="runName">Ready for replay</strong><span id="source" class="muted"></span></div>
+      <div id="epochText">Epoch 0 / 0</div>
+      <div class="progress"><div id="progressBar"></div></div>
+    </section>
+    <section class="cards">
+      <div class="card"><span>Precision</span><strong id="precision">—</strong></div>
+      <div class="card"><span>Recall</span><strong id="recall">—</strong></div>
+      <div class="card"><span>mAP@0.5</span><strong id="map50">—</strong></div>
+      <div class="card"><span>mAP@0.5:0.95</span><strong id="map5095">—</strong></div>
+    </section>
+    <section class="grid">
+      <div class="panel"><h2>Validation metrics</h2><canvas id="chart" width="700" height="300"></canvas><div class="legend"><span class="green">● mAP@0.5</span><span class="blue">● mAP@0.5:0.95</span><span class="yellow">● precision</span><span class="red">● recall</span></div></div>
+      <div class="panel"><h2>Epoch log</h2><div id="feed" class="feed"><p class="muted">Press “Play training replay” to begin.</p></div></div>
+    </section>
+    <section id="summary" class="panel hidden"></section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
